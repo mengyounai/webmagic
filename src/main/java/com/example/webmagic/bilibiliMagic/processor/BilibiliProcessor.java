@@ -27,63 +27,55 @@ import us.codecraft.webmagic.proxy.Proxy;
 import us.codecraft.webmagic.proxy.SimpleProxyProvider;
 import us.codecraft.webmagic.scheduler.BloomFilterDuplicateRemover;
 import us.codecraft.webmagic.scheduler.QueueScheduler;
-import us.codecraft.webmagic.selector.Html;
-import us.codecraft.webmagic.selector.Json;
-import us.codecraft.webmagic.selector.Selectable;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.sql.SQLOutput;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 //爬取分p视频
 @Component
 public class BilibiliProcessor implements PageProcessor {
 
-    private static int index = 114;
+    private static int index = 1;
     private static int num = index-1;
     private static String basecookie = "_uuid=53E3C6FE-1D8A-F3B2-7E23-ACA84A536D4F63234infoc; buvid3=D401D951-D96A-4691-A664-CDAF15B0234D53941infoc; CURRENT_FNVAL=16; rpdid=|(J|)JulY|Yk0J'ulmuJk)l~R; sid=a9w7482a; finger=-166317360; LIVE_BUVID=AUTO8715959029630612; PVID=3;";
-    private static String url = "https://www.bilibili.com/video/BV1Vf4y1T7bw/?p=" +index + "&vd_source=01fd8b7382cc4009c06bedf3c5353d82";
-    private static String cookie =  basecookie+"_jct=2b7857b0d0b011eaa7f77ea539b9b3b7; DedeUserID=391625460; DedeUserID__ckMd5=accdac0e7e5f4f56; SESSDATA=a7c5c1cc%2C1611478568%2C56408*71; bili_jct=fe0e50c7ef84f6938d345f2b0c5e31d4";
+    private static String beforeUrl = "https://www.bilibili.com/video/BV1LT4y1e72X?p=";
+    private static String url = beforeUrl;
+    private static int QUALITY = 120;
+    private static String cookie =  "buvid3=22BAEFCF-20DE-704E-9EA9-7D5EA85B420505603infoc; i-wanna-go-back=-1; _uuid=991B8C5E-96C4-A9A5-A1DE-B175A64103E8907263infoc; buvid4=901B68D0-2B30-EC14-1E33-03D052809BB911094-022081021-KXkDA7bwdIpRVrb4MGeykw%3D%3D; buvid_fp_plain=undefined; DedeUserID=18757587; DedeUserID__ckMd5=79197dfe0a71c602; nostalgia_conf=-1; CURRENT_BLACKGAP=0; b_ut=5; LIVE_BUVID=AUTO5216610872674217; b_nut=100; rpdid=|(Rllmu)mRk0J'uYYm|RJ|R|; header_theme_version=CLOSE; CURRENT_FNVAL=4048; CURRENT_QUALITY="+QUALITY+"; CURRENT_PID=d0cc7200-ca4f-11ed-9db2-4752a2e4783e; FEED_LIVE_VERSION=V_TOPSWITCH_FLEX_TOTOP; fingerprint=b0d8a76a386f3885fc176f13abaa918e; buvid_fp=b0d8a76a386f3885fc176f13abaa918e; SESSDATA=1460e7b8%2C1703860564%2C34790%2A72SkTl1_wmXvcL62qWOcabWGdjJvVT9QJ45K5o2nMDqGpWljJDisNlbRQHbRUicaKCI1squQAAVwA; bili_jct=dbd379f5eabd5d0b0c96df1820246d8e; home_feed_column=5; browser_resolution=1536-754; b_lsid=22102BC57_1891CD67761; PVID=1; bp_video_offset_18757587=814181978056163300; sid=dwtl256a";
 
     //解析页面
     @Override
     public void process(Page page) {
 
+
         //提取视频的标题
         Document titleDoc = Jsoup.parse(page.getHtml().get());
         Elements titleScriptEle = titleDoc.select("script");
-        String titleDataStr = titleScriptEle.get(3).data();
+        String titleDataStr = titleScriptEle.get(4).data();
         String titleData = titleDataStr.substring(titleDataStr.indexOf("{"),titleDataStr.indexOf("function()")-2);
+//        String titleData = titleDataStr.substring(titleDataStr.indexOf("{"));
+
         JSONObject titleJSONObject = JSONObject.parseObject(titleData);
         String title = titleJSONObject.getJSONObject("videoData")
                 .getJSONArray("pages")
                 .getJSONObject(num++)
                 .getString("part");
+        int size = titleJSONObject.getJSONObject("videoData").getJSONArray("pages").size();
+        title = title.replace("  "," ")
+                .replace("/","_");
+        title = "P"+index+"."+title;
         System.out.println("视频标题为:"+title);
         if (EmptyUtil.isEmpty(title)){
             return;
         }
-        if (index < 200){
+        if (index < size){
             index++;
-            url = "https://www.bilibili.com/video/BV1Vf4y1T7bw/?p=" +index + "&vd_source=01fd8b7382cc4009c06bedf3c5353d82";
+            url =  beforeUrl + index;
             page.addTargetRequest(url);
         }
 
         //提取视频对应的json数据
         Document pageDoc = Jsoup.parse(page.getHtml().get());
         Elements scriptEle = pageDoc.select("script");
-        String dataStr = scriptEle.get(2).data();
+        String dataStr = scriptEle.get(3).data();
 //        System.out.println("视频json数据为:"+dataStr);
         String data = dataStr.substring(dataStr.indexOf("{"));
         JSONObject jsonObject = JSONObject.parseObject(data);
@@ -112,7 +104,11 @@ public class BilibiliProcessor implements PageProcessor {
         String videoPath = DownloadUtil.videoDownLoad(video_url, title);
         String audioPath = DownloadUtil.audioDownLoad(audio_url,title);
         //合并
-        DownloadUtil.ffmpegMerge(videoPath,audioPath);
+//        DownloadUtil.ffmpegMerge(videoPath,audioPath);
+        if(index == size){
+            DownloadUtil.mergeList();
+        }
+
     }
 
     private Site site = Site.me()

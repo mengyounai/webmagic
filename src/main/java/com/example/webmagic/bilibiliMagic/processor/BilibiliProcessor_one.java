@@ -19,10 +19,10 @@ import us.codecraft.webmagic.scheduler.BloomFilterDuplicateRemover;
 import us.codecraft.webmagic.scheduler.QueueScheduler;
 
 //爬取单个视频
-//@Component
+@Component
 public class BilibiliProcessor_one implements PageProcessor {
 
-    private static String url = "https://www.bilibili.com/video/BV1gB4y1m7BR/?spm_id_from=333.851.b_62696c695f7265706f72745f646f756761.9&vd_source=01fd8b7382cc4009c06bedf3c5353d82";
+    private static String url = "https://www.bilibili.com/video/BV1eh4y1M7mx/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=01fd8b7382cc4009c06bedf3c5353d82";
 
     //解析页面
     @Override
@@ -33,6 +33,8 @@ public class BilibiliProcessor_one implements PageProcessor {
         if (EmptyUtil.isEmpty(title)){
             return;
         }
+        title = title.replace("  "," ")
+                .replace("/","_");
 
 
         //提取视频对应的json数据
@@ -43,7 +45,6 @@ public class BilibiliProcessor_one implements PageProcessor {
         String data = dataStr.substring(dataStr.indexOf("{"));
         JSONObject jsonObject = JSONObject.parseObject(data);
 //        System.out.println(data);
-
 
         //提取音频的url地址
         String audio_url = jsonObject
@@ -59,7 +60,7 @@ public class BilibiliProcessor_one implements PageProcessor {
                 .getJSONObject("data")
                 .getJSONObject("dash")
                 .getJSONArray("video")
-                .getJSONObject(0)
+                .getJSONObject(1)
                 .getJSONArray("backupUrl")
                 .getString(0);
 
@@ -67,7 +68,7 @@ public class BilibiliProcessor_one implements PageProcessor {
         String videoPath = DownloadUtil.videoDownLoad(video_url, title);
         String audioPath = DownloadUtil.audioDownLoad(audio_url,title);
         //合并
-        DownloadUtil.ffmpegMerge(videoPath,audioPath);
+//        DownloadUtil.ffmpegMerge(videoPath,audioPath);
     }
 
     private Site site = Site.me()
@@ -76,6 +77,8 @@ public class BilibiliProcessor_one implements PageProcessor {
             .setRetryTimes(3000)    //设置重试的间隔时间，单位ms
             .setSleepTime(3)
             .addHeader("referer","https://www.bilibili.com/")
+            .addCookie("Cookie","\n" +
+                    "buvid3=22BAEFCF-20DE-704E-9EA9-7D5EA85B420505603infoc; i-wanna-go-back=-1; _uuid=991B8C5E-96C4-A9A5-A1DE-B175A64103E8907263infoc; buvid4=901B68D0-2B30-EC14-1E33-03D052809BB911094-022081021-KXkDA7bwdIpRVrb4MGeykw%3D%3D; buvid_fp_plain=undefined; DedeUserID=18757587; DedeUserID__ckMd5=79197dfe0a71c602; nostalgia_conf=-1; CURRENT_BLACKGAP=0; b_ut=5; LIVE_BUVID=AUTO5216610872674217; b_nut=100; rpdid=|(Rllmu)mRk0J'uYYm|RJ|R|; header_theme_version=CLOSE; CURRENT_FNVAL=4048; CURRENT_QUALITY=60; CURRENT_PID=d0cc7200-ca4f-11ed-9db2-4752a2e4783e; FEED_LIVE_VERSION=V_TOPSWITCH_FLEX_TOTOP; fingerprint=b0d8a76a386f3885fc176f13abaa918e; buvid_fp=b0d8a76a386f3885fc176f13abaa918e; SESSDATA=1460e7b8%2C1703860564%2C34790%2A72SkTl1_wmXvcL62qWOcabWGdjJvVT9QJ45K5o2nMDqGpWljJDisNlbRQHbRUicaKCI1squQAAVwA; bili_jct=dbd379f5eabd5d0b0c96df1820246d8e; home_feed_column=5; browser_resolution=1536-754; b_lsid=22102BC57_1891CD67761; PVID=1; bp_video_offset_18757587=814181978056163300; sid=dwtl256a")
             .addHeader("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36")
             ;       //设置重试次数
 
@@ -104,8 +107,10 @@ public class BilibiliProcessor_one implements PageProcessor {
     }
 
     public static void main(String[] args) {
+        System.out.println();
         Spider.create(new BilibiliProcessor_one())
                 .addUrl(url)
+
                 .setScheduler(new QueueScheduler().setDuplicateRemover(new BloomFilterDuplicateRemover(10000 * 1000))) //设置布隆过滤器
                 .thread(5)
                 .run();
